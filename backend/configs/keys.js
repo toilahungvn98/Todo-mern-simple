@@ -1,0 +1,4 @@
+module.exports = {
+    mongoURI : 'mongodb+srv://hung:hung123@cluster0-jt3no.mongodb.net/todos?retryWrites=true&w=majority',
+    secretOrKey : 'bimat'
+}

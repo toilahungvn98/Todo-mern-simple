@@ -2,17 +2,31 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const keys = require('../../configs/keys');
+const config = require('config');
+const secretKey = config.get('secretOrKey');
 
 //validation
 
 const validateRegister = require('../../validation/register');
-const validateLogin = require('../../validation/login');
 
 //Models
 const User = require('../../models/User');
 
+//middleware 
+const authMiddleware = require('../../middleware/auth');
+
 //API
+
+//@route GET users/
+//@desc info user private
+//@access Private
+router.get('/',authMiddleware, async (req, res) => {
+    const infoUser =  await User.findById(req.user.id).select('-password');
+    if(infoUser) {
+        return res.json(infoUser);
+    }
+})
+
 
 //@route POST users/register
 //@desc Register user
@@ -30,7 +44,8 @@ router.post('/register', async (req, res) => {
     }
 
     try {
-
+        //fetch all email user in db, if exists return msg,
+        //else create new user ( hash, sign jwt)
         const fetch = await User.findOne({
             email: req.body.email
         });
@@ -51,7 +66,24 @@ router.post('/register', async (req, res) => {
                     if (err) throw err;
                     newUser.password = hash;
                     newUser.save()
-                        .then(user => res.json(user));
+                        .then(user => {
+                            jwt.sign(
+                                { id : user.id},
+                                secretKey,
+                                { expiresIn : '12h' },
+                                (err, token) => {
+                                    if (err) throw err;
+                                    return res.json({
+                                        token,
+                                        user : {
+                                            id : user.id,
+                                            name : user.name,
+                                            email : user.email
+                                        }
+                                    })
+                                }
+                            )
+                        });
                 })
             });
         }
@@ -65,68 +97,5 @@ router.post('/register', async (req, res) => {
 
 });
 
-//@route POST users/login
-//@desc Login user  and return JWT token
-//@access Public
-router.post("/login", async (req, res) => {
-    // Form validation
-    const {
-        errors,
-        isValid
-    } = validateLogin(req.body);
-    // Check validation
-    if (!isValid) {
-        return res.status(400).json(errors);
-    }
-    const email = req.body.email;
-    const password = req.body.password;
-    // Find user by email
-    try {
-        const user = await User.findOne({
-            email
-        });
-
-        // Check if user exists
-        if (!user) {
-            return res.status(404).json({
-                msg: "Email not found"
-            });
-        }
-        // Check password
-        const isMatch = await bcrypt.compare(password, user.password);
-
-        if (isMatch) {
-            // User matched
-            // Create JWT Payload
-            const payload = {
-                id: user.id,
-                name: user.name
-            };
-            // Sign token
-            jwt.sign(
-                payload,
-                keys.secretOrKey, {
-                    expiresIn: 31556926 // 1 year in seconds
-                },
-                (err, token) => {
-                    res.json({
-                        success: true,
-                        token: "Bearer " + token
-                    });
-                }
-            );
-        } else {
-            return res
-                .status(400)
-                .json({
-                    msg: "Password incorrect"
-                });
-        }
-
-
-    } catch (error) {
-        console.log(error);
-    }
-});
 
 module.exports = router;

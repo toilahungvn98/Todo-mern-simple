@@ -1,11 +1,16 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const passport = require('passport');
+
+const cors = require('cors');
+
+const config = require('config');
 const userRouter = require('./routes/api/users');
+const authRouter = require('./routes/api/auth');
 const todoRouter = require('./routes/api/todos');
+
 const app = express();
 //mongo key in config file
-const dbURI = require('./configs/keys').mongoURI;
+const dbURI = config.get('mongoURI');
 
 //connect databse 
 
@@ -19,14 +24,15 @@ mongoose
 .catch( err => console.log(err));
 
 //middleware
+app.use(cors());
 app.use(express.urlencoded({ extended : false }));
 app.use(express.json());
-app.use(passport.initialize());
-require('./configs/passport')(passport);
+
 
 //Router middleware
-app.use('/users', userRouter);
-app.use('/', todoRouter);
+app.use('/user', userRouter);
+app.use('/auth', authRouter);
+app.use('/todo', todoRouter);
 
 const port = process.env.PORT || 5000;
 app.listen(port, () => console.log(`Server running on port ${port}`));
